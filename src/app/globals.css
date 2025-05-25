@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+@layer components {
+  .custom-input {
+    @apply w-full h-[50px] rounded-lg border border-gray-300 focus:outline-none focus:border-[#2196F3] px-4 placeholder-[#ccccd2] text-black;
+  }
+
+  .custom-button{
+    @apply w-full h-[50px] rounded-xl bg-[#2196F3] text-white font-semibold hover:bg-[#1976D2] transition-colors
+  }
+}
