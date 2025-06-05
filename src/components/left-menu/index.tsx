@@ -4,6 +4,7 @@ import Edit from "@/assets/edit.svg";
 import Users from "@/assets/users.svg";
 import Arrow1 from "@/assets/arrow.svg";
 import Financial from "@/assets/trending.svg";
+import Calendar from "@/assets/agenda.svg";
 import WalletIcon from "@/assets/wallet.svg";
 import Logout from "@/assets/log-out.svg";
 import Link from "next/link";
@@ -42,6 +43,15 @@ export default function LeftMenu() {
               <figure className="flex flex-row items-center gap-2">
                 <Edit className="w-[28px] h-[28px]" strokeWidth={2} />
                 <figcaption>Serviços</figcaption>
+              </figure>
+            </li>
+          </Link>
+
+          <Link href="/opening-hours" title="Horário de Funcionamento">
+            <li className={`${pathname.includes('opening-hours') || pathname.includes('opening-hours') ? 'bg-[#E9F5FE]' : ''} hover:bg-[#E9F5FE] py-5 px-4 rounded-lg cursor-pointer`}>
+              <figure className="flex flex-row items-center gap-2">
+                <Calendar className="w-[29px] h-[29px]" strokeWidth={10} />
+                <figcaption>Agenda da Clínica</figcaption>
               </figure>
             </li>
           </Link>
@@ -100,6 +110,7 @@ export default function LeftMenu() {
               </Link>
             </ul>
           </li>
+          
         </ul>
 
         <Link href="/logout" title="Sair">

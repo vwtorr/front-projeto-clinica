@@ -15,8 +15,9 @@ export default function ListExpenses() {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [initialDate, setInitialDate] = useState<string>();
   const [finalDate, setFinalDate] = useState<string>();
-  const { listExpenses, searchRegister, deleteExpense } = useExpenseContext();
+  const { listExpenses, searchRegister, deleteExpense, updatePaymentStatus } = useExpenseContext();
 
+  // Carrega a lista de despesas
   const handleListExpenses = useCallback(async () => {
     try {
       if (!token) return;
@@ -30,6 +31,7 @@ export default function ListExpenses() {
     }
   }, [token, listExpenses]);
 
+  // Pesquisa filtrada
   const handlesSearch = useCallback(async (search?: string) => {
     try {
       if (!token) return;
@@ -43,10 +45,12 @@ export default function ListExpenses() {
     }
   }, [token, searchRegister, initialDate, finalDate]);
 
+  // Navega para criar nova despesa
   const handlesNewTitle = () => {
     router.push('expense/new');
   };
 
+  // Exclui despesa
   const handleDelete = async (id: number) => {
     if (!token) return;
 
@@ -59,9 +63,25 @@ export default function ListExpenses() {
     }
   };
 
+  // Atualiza status da despesa (pagar ou receber)
+  const handlePayOrReceive = async (id: number, newStatus: string) => {
+  if (!token) return;
+
+  try {
+    await updatePaymentStatus(token, id, newStatus);
+    // Atualiza localmente a lista para refletir mudança
+    setExpenses(prev =>
+      prev.map(expense => expense.id === id ? { ...expense, status: newStatus } : expense)
+    );
+  } catch (error) {
+    console.error("Erro ao atualizar status:", error);
+    alert("Erro ao atualizar status.");
+  }
+};
+
   useEffect(() => {
     handleListExpenses();
-  }, [token]);
+  }, [token, handleListExpenses]);
 
   return (
     <Layout>
@@ -69,14 +89,20 @@ export default function ListExpenses() {
       <div className="w-full h-[1px] my-8 bg-slate-400" ></div>
 
       <section className="flex flex-row gap-4 items-center justify-between mb-4">
-        <Input isFlex label="Buscar:" searchIcon type="search" placeholder="Buscar..." onChange={(event) => handlesSearch(event.target.value)} />
+        <Input
+          isFlex
+          label="Buscar:"
+          searchIcon
+          type="search"
+          placeholder="Buscar..."
+          onChange={(event) => handlesSearch(event.target.value)}
+        />
         <Button
           iconPlus
           label="Novo Título"
-          onClick={() => handlesNewTitle()}
+          onClick={handlesNewTitle}
           style={{ backgroundColor: '#5D7285', color: 'white' }}
         />
-
       </section>
 
       <section className="py-4 flex gap-4 items-end justify-between mb-4 w-full">
@@ -90,6 +116,7 @@ export default function ListExpenses() {
       <TableExpenses
         data={expenses ?? []}
         onDelete={handleDelete}
+        onPayOrReceive={handlePayOrReceive}  
       />
     </Layout>
   );

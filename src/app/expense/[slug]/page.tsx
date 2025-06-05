@@ -6,60 +6,100 @@ import Layout from "@/components/layout";
 import { useAuth } from "@/context/auth";
 import { useExpenseContext } from "@/context/expense";
 import { useCallback, useEffect, useState } from "react";
+import ConfirmationBox from "@/components/confirmation-box";
+import SuccessBox from "@/components/success-box";
+import AlertBox from "@/components/alert-box";
 
 export default function Expense() {
   const router = useRouter();
   const { slug } = useParams();
-  const params = useParams();
-  const expenseId = params?.slug;
   const { token } = useAuth();
-  const [expense, setExpense] = useState<any>();
+  const { createExpenses, getExpenseById, updateExpense } = useExpenseContext();
+
+  const [expense, setExpense] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(slug === "new");
+  const [showConfirm, setShowConfirm] = useState(false);
 
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
-  const { createExpenses, getExpenseById } = useExpenseContext();
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
 
-  const submitForm = useCallback(async (event: any) => {
-    event.preventDefault();
+  const handleCloseSuccess = () => {
+    setIsSuccessOpen(false);
+    router.push("/expenses");
+  };
+
+  const handleConfirmedSubmit = useCallback(async () => {
     try {
       if (!token || !expense) return;
 
-      const expenseToCreate = {
+      const expenseToSubmit = {
         ...expense,
-        status: "PENDENTE",
-        paymentStatus: "PENDENTE" 
+        status: slug === "new" ? "PENDENTE" : expense.status,
       };
 
+      let response;
+      if (slug === "new") {
+        response = await createExpenses(token, expenseToSubmit);
+      } else {
+        response = await updateExpense(token, Number(slug), expenseToSubmit);
+      }
 
-      const newEmployee = await createExpenses(token, expenseToCreate);
-      const status = newEmployee.status;
+      if (response?.status === 200 || response?.status === 201) {
+        if (slug === "new") {
+          setSuccessMessage("Título criado com sucesso!");
+        } else {
+          setSuccessMessage("Título atualizado com sucesso!");
+        }
+        setIsSuccessOpen(true);
+      } else {
+        setAlertMessage("Esse documento já foi lançado!");
+        setAlertOpen(true);
+      }
 
-      if (status != 201 || !newEmployee?.data) return;
-
-      router.push("/expenses");
+      setShowConfirm(false);
     } catch (error) {
-      console.log(error);
+      console.error(error);
+      setSuccessMessage("Erro ao salvar título.");
+      setIsSuccessOpen(true);
+      setShowConfirm(false);
     }
-  }, [token, router, expense, createExpenses]);
+  }, [token, expense, createExpenses, updateExpense, slug]);
 
+  const submitForm = useCallback((event: any) => {
+    event.preventDefault();
+    setShowConfirm(true);
+  }, []);
 
   const handleLoadingData = useCallback(async () => {
     if (!token) return;
-    if (expenseId && expenseId != 'new') {
-      const expenseData = await getExpenseById(token, + expenseId);
-      if (!expenseData?.data && expenseData.status != 200) return;
-      setExpense(expenseData?.data);
+
+    if (slug && slug !== "new") {
+      const expenseData = await getExpenseById(token, Number(slug));
+
+      if (!expenseData?.data || expenseData.status !== 200) return;
+
+      setExpense(expenseData.data);
+      setIsEditing(false);
     }
-  }, [setExpense, token, expenseId]);
+  }, [token, slug, getExpenseById]);
+
   useEffect(() => {
     handleLoadingData();
-  }, [token, handleLoadingData])
-  if (expenseId && expenseId != 'new' && !expense?.type) {
-    return (<div className="flex items-center justify-center gap-2 h-40">
-      <div className="animate-spin rounded-full h-6 w-6 border-t-4 border-blue-500 border-solid"></div>
-      <span className="text-gray-700 font-medium">Carregando...</span>
-    </div>
-    )
+  }, [handleLoadingData]);
+
+  function formatCurrency(value: string) {
+    const numericValue = value.replace(/\D/g, ""); // remove tudo que não for número
+    const number = parseFloat(numericValue) / 100;
+
+    if (isNaN(number)) return "";
+
+    return number.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
   }
 
   return (
@@ -67,10 +107,10 @@ export default function Expense() {
       <div className="flex justify-between items-center mb-10">
         <h1 className="text-4xl font-bold mb-10 text-[#5D7285]">
           {slug === "new"
-            ? "Cadastro de Despesa"
+            ? "Cadastro de Título"
             : isEditing
-              ? "Edição de Despesa"
-              : "Visualização de Despesa"}
+              ? "Edição de Título"
+              : "Visualização de Título"}
         </h1>
 
         {slug !== 'new' && !isEditing && (
@@ -106,42 +146,48 @@ export default function Expense() {
                 onChange={(event) =>
                   setExpense((oldValue: any) => ({
                     ...oldValue,
-                    document: event.target.value
+                    document: event.target.value.slice(0, 8)  
                   }))
                 }
                 value={expense?.document ?? ""}
                 disabled={!isEditing}
               />
+
               <div className="w-full h-[1px] my-8 bg-slate-400" ></div>
             </div>
 
 
-            <div >
-              <label
-                htmlFor="valor"
-                className="blocktext-xl font-medium required"
-              >
+            <div>
+              <label htmlFor="valor" className="block text-xl font-medium required">
                 <span className="text-red-500">*</span>
                 <span className="text-black"> Valor:</span>
               </label>
               <input
                 type="text"
+                inputMode="numeric"
                 className={`w-full px-6 py-4 rounded-lg text-lg focus:outline-none ${!isEditing ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : ''}`}
                 id="valor"
-                placeholder="150"
+                placeholder="R$ 150,00"
                 required
-                onChange={(event) =>
+                onChange={(event) => {
+                  const rawValue = event.target.value.replace(/\D/g, '');
+                  const numericValue = Number(rawValue) / 100;
+
                   setExpense((oldValue: any) => ({
                     ...oldValue,
-                    value: event.target.value
-                  }))
-                }
-                value={expense?.value ?? ""}
+                    value: numericValue,   // Armazena como número!
+                  }));
+                }}
+                value={expense?.value !== undefined
+                  ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(expense.value)
+                  : ''}
                 disabled={!isEditing}
                 aria-label="valor"
               />
-              <div className="w-full h-[1px] my-8 bg-slate-400" ></div>
+
+              <div className="w-full h-[1px] my-8 bg-slate-400"></div>
             </div>
+
 
             <div >
               <label
@@ -177,7 +223,7 @@ export default function Expense() {
               <select
                 id="tipo"
                 className={`w-full px-6 py-4 rounded-lg text-lg focus:outline-none
-                ${isEditing ? 'bg-white text-black' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                ${(slug !== "new") ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-white text-black'}`}
                 required
                 onChange={(event) =>
                   setExpense((oldValue: any) => ({
@@ -186,7 +232,7 @@ export default function Expense() {
                   }))
                 }
                 value={expense?.type ?? ""}
-                disabled={!isEditing}
+                disabled={slug !== "new"}
                 aria-label="titulo"
               >
                 <option value="" disabled>
@@ -195,6 +241,7 @@ export default function Expense() {
                 <option value="Conta a Pagar">Conta a Pagar</option>
                 <option value="Conta a Receber">Conta a Receber</option>
               </select>
+
               <div className="w-full h-[1px] my-8 bg-slate-400"></div>
             </div>
           </div>
@@ -258,6 +305,29 @@ export default function Expense() {
                 <span className="ml-2">SALVAR</span>
               </button>
             )}
+
+            {/* ConfirmationBox aparece só se showConfirm for true */}
+            {showConfirm && (
+              <ConfirmationBox
+                isOpen={showConfirm}
+                message="Deseja realmente confirmar a operação ?"
+                onConfirm={handleConfirmedSubmit}
+                onCancel={() => setShowConfirm(false)}
+              />
+            )}
+
+            <SuccessBox
+              isOpen={isSuccessOpen}
+              message={successMessage}
+              onClose={handleCloseSuccess}
+            />
+
+            <AlertBox
+              isOpen={alertOpen} // em vez de isAlertOpen
+              message={alertMessage}
+              onClose={() => setAlertOpen(false)} // em vez de setIsAlertOpen
+            />
+
           </div>
         </div>
       </form>

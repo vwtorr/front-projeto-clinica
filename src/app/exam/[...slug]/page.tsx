@@ -10,14 +10,16 @@ import { Input } from '@/components/input';
 import { useUserContext } from "@/context/user";
 import { useServiceContext } from "@/context/service";
 import Loading from "@/components/loading";
+import AlertBox from "@/components/alert-box";
 
 export default function Page() {
   const { slug } = useParams();
+
   const router = useRouter();
   const { token } = useAuth();
   const { searchRegisterUser, getUserById } = useUserContext();
   const { searchRegister } = useServiceContext();
-  const { createExam, getExams, deleteExam } = useExamContext();
+  const { createExam, getExamView, deleteExam, updateExam } = useExamContext();
 
   const [patient, setPatient] = useState<any[]>([]);
   const [seletedPatient, setSelectedPatient] = useState<any>(null);
@@ -27,11 +29,11 @@ export default function Page() {
   const [popup, setPopup] = useState(false);
   const [searchText, setSearchText] = useState('');
   const params = useParams();
-  const examId = params?.slug;
+  const examId = params?.slug ? params.slug[0] : 0;
   const [isEditing, setIsEditing] = useState(examId === 'new');
-  const [isViewing, setIsViewing] = useState(true);
   const isRegisteringPatient = examId === 'new';
-
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
 
   const newPatient = () => router.push('/patient/new');
 
@@ -43,9 +45,10 @@ export default function Page() {
         return;
       }
       const response = await searchRegister(token, search);
-      const availableServices = response?.data || [];
+      let availableServices = response?.data || [];
 
-      // Filtra os serviços para não mostrar os já selecionados
+      availableServices = availableServices.filter((service: any) => service.status === true);
+
       const filteredServices = availableServices.filter((service: any) =>
         !selectedServices.some((selectedItem: any) => selectedItem.id === service.id)
       );
@@ -56,15 +59,9 @@ export default function Page() {
     }
   }, [token, searchRegister, selectedServices]);
 
-  const removeItem = async (id: string | number, item?: any) => {
-    try {
-      setSelectedServices((prev) => prev.filter(s => s.id !== id));
-      if (item?.existItem) {
-        await deleteExam(token, item?.itemId);
-      }
-    } catch (error) {
-      console.log(error);
-    }
+
+  const removeItem = (id: string | number) => {
+    setSelectedServices((prev) => prev.filter(s => s.id !== id));
   };
 
   const handlesSearchUser = useCallback(async (search?: string) => {
@@ -75,7 +72,9 @@ export default function Page() {
         return;
       }
       const response = await searchRegisterUser(token, 'patient', search);
-      setPatient(response?.data || []);
+      const users = response?.data || [];
+      const filteredPatients = users.filter((user: any) => user.roleId === 3);
+      setPatient(filteredPatients);
     } catch (error) {
       console.log(error);
     }
@@ -84,12 +83,53 @@ export default function Page() {
   const submitForm = useCallback(async (event: any) => {
     event.preventDefault();
     try {
-      if (!token || !seletedPatient) return;
+      if (!token || !seletedPatient || !slug) return;
 
       setPopup(true);
+
+
+      const existingExams = await getExamView(token, seletedPatient.id, slug[1] as string);
+      //const hasPendingExam = existingExams.data?.some((exam: any) => exam.statusExam === "PENDENTE");
+      //
+      //if (hasPendingExam) {
+      //  setAlertMessage("Este paciente já possui um exame com status 'PENDENTE'. Para continuar, edite ou conclua o exame existente.");
+      //  setAlertOpen(true);
+      //  setPopup(false);
+      //  return;
+      //}
+
+      const isEditingExam = slug[0] !== 'new';
+
+      if (isEditingExam) {
+        const id = Number(slug[0]);
+        const serviceData = await getExamView(token, id, slug[1] as string);
+        const originalItems = serviceData.data.map((item: any) => ({
+          ...item.service,
+          itemId: item?.id,
+          existItem: true,
+        }));
+
+        const removedItems = originalItems.filter((originalItem: any) =>
+          !selectedServices.some((selectedItem: any) => selectedItem.itemId === originalItem.itemId)
+        );
+
+        for (const item of removedItems) {
+          await deleteExam(token, item.itemId);
+        }
+      }
+
       for (const item of selectedServices) {
-        if (!item.existItem) {
-          const result = await createExam(token, {
+        if (item.existItem && isEditingExam) {
+
+          await updateExam(Number(item.itemId), token, {
+            dateTime: timeDate,
+            statusExam: "PENDENTE",
+            paymentStatus: "PENDENTE"
+          });
+
+        } else {
+
+          await createExam(token, {
             ...seletedPatient,
             userId: seletedPatient.id,
             serviceId: item.id,
@@ -97,7 +137,6 @@ export default function Page() {
             statusExam: "PENDENTE",
             paymentStatus: "PENDENTE"
           });
-
         }
       }
 
@@ -106,8 +145,10 @@ export default function Page() {
 
     } catch (error) {
       console.log(error);
+      setPopup(false);
     }
-  }, [token, seletedPatient, selectedServices, timeDate, createExam]);
+  }, [token, seletedPatient, selectedServices, timeDate, createExam, deleteExam, getExamView, slug]);
+
 
   const selectPatient = (item: any) => {
     setSelectedPatient(item);
@@ -122,13 +163,18 @@ export default function Page() {
     }
   };
 
+  const handleCloseAlert = () => {
+    setAlertOpen(false);
+    setSelectedPatient(null); // Evita novo envio com mesmo paciente
+  };
+
   const handlesLoadingData = useCallback(async () => {
     if (!slug || slug === 'new' || !token) return;
 
-    const id = Number(slug);
+    const id = Number(slug[0]);
     if (isNaN(id)) return;
 
-    const serviceData = await getExams(token, id);
+    const serviceData = await getExamView(token, id, slug[1] as string);
     if (serviceData.status !== 200) return;
 
     const data = serviceData.data;
@@ -143,7 +189,7 @@ export default function Page() {
 
     const request = await getUserById(token, id);
     setSelectedPatient(request.data);
-  }, [token, slug, getExams, getUserById]);
+  }, [token, slug, getExamView, getUserById]);
 
   useEffect(() => {
     handlesLoadingData();
@@ -173,7 +219,6 @@ export default function Page() {
     return `R$ ${numericValue.toFixed(2).replace('.', ',')}`;
   };
 
-
   return (
     <Layout>
       {popup && <Loading />}
@@ -186,7 +231,7 @@ export default function Page() {
               : 'Visualização de Exame'}
         </h1>
 
-        {examId !== 'new' && !isEditing && (
+        {examId !== 'new' && !isEditing && seletedPatient?.exams[0]?.paymentStatus !== 'PAGO' && (
           <button
             onClick={() => setIsEditing(true)}
             className="px-3 py-3 bg-[#2196F3] text-white rounded hover:bg-[#1E88E5] font-semibold flex items-center"
@@ -284,7 +329,7 @@ export default function Page() {
                     <button
                       type="button"
                       className="ml-2 hover:text-red-300 focus:outline-none"
-                      onClick={() => removeItem(item?.id, item)}
+                      onClick={() => removeItem(item?.id)}
                     >
                       ✕
                     </button>
@@ -355,6 +400,12 @@ export default function Page() {
               <span className="ml-2">SALVAR</span>
             </button>
           )}
+
+          <AlertBox
+            isOpen={alertOpen}
+            message={alertMessage}
+            onClose={handleCloseAlert}
+          />
         </div>
       </form>
     </Layout>

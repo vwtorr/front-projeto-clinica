@@ -7,11 +7,14 @@ import { useAuth } from "@/context/auth";
 import { useParams } from "next/navigation";
 import { useUserContext } from "@/context/user";
 import { useRouter } from 'next/navigation';
+import ConfirmationBox from "@/components/confirmation-box";
+import SuccessBox from "@/components/success-box";
+import AlertBox from "@/components/alert-box";
 
 export default function Patient() {
   const { slug } = useParams();
   const { token } = useAuth();
-  const { updateAddress, createNotes, updateNotes, createUser, createAddress, updatePatient, getPatientById, createPatientNotes } = useUserContext();
+  const { updateAddress, createNotes, updateNotes, createUser, createAddress, updatePatient, getPatientById, createPatientNotes, searchRegisterUser } = useUserContext();
   const [patient, setPatient] = useState<any>(null);
   const [address, setAddress] = useState<any>(null);
   const [notes, setNotes] = useState<any>(null);
@@ -19,92 +22,150 @@ export default function Patient() {
   const params = useParams();
   const patientId = params?.slug;
   const [isEditing, setIsEditing] = useState(patientId === 'new');
+  const [successMessage, setSuccessMessage] = useState("");
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
 
-  const submitForm = useCallback(async (event: any) => {
-    event.preventDefault();
-    if (!token || !patient) return;
+const handleConfirmedSubmit = useCallback(async () => {
+  if (!token || !patient) return;
 
-    try {
-      if (slug === "new") {
-        const newPatient = {
-          ...patient,
-          roleId: 3,
-        };
-        const newUser = await createUser(token, newPatient);
+  try {
+    if (patient?.document.length !== 11) {
+      setAlertMessage("O CPF deve conter exatamente 11 dígitos.");
+      setAlertOpen(true);
+      return;
+    }
 
-        if (newUser.status === 201) {
-          const addressPayload = {
-            ...address,
-            userId: newUser.data.id,
-          };
-          await createAddress(token, addressPayload);
+    const existingUsers = await searchRegisterUser(token, "users", patient.document);
 
-          // Salvar as notas do paciente
-          const patientNotes = {
-            allergy: notes?.allergy?.split(',').map((item: any) => item.trim()),
-            bloodType: notes?.bloodType
-          };
-          await createPatientNotes(token, patientNotes);
+    const cpfJaExiste = existingUsers?.data?.find(
+      (user: any) => user.id !== patient.id
+    );
 
-          window.location.pathname = "patients";
-        } else {
-          console.warn("Erro ao criar paciente:", newUser);
-        }
+    if (cpfJaExiste) {
+      let roleMessage = "";
 
+      if (cpfJaExiste.roleId === 1) {
+        roleMessage = "Já existe um administrador cadastrado com esse CPF.";
+      } else if (cpfJaExiste.roleId === 2) {
+        roleMessage = "Já existe um funcionário cadastrado com esse CPF.";
+      } else if (cpfJaExiste.roleId === 3) {
+        roleMessage = "Já existe um paciente cadastrado com esse CPF.";
       } else {
-        const id = Number(slug);
-        if (!isNaN(id)) {
-          const updated = await updatePatient(id, patient, token);
-          if (address.id) {
-              await updateAddress(address.id, {
-                ...address,
-                zipCode: address.zipCode,
-              }, token);
-          } else {
-               const newAddress = {
-                  userId: patientId,
-                  zipCode: address.zipCode,
-                  street: address.street,
-                  neighborhood: address.neighborhood,
-                  city: address.city,
-                  state: address.state,
-                };
-              await createAddress(token, newAddress);   
-            }
-
-            if(notes.id){
-            // Salvar as notas do paciente
-                  const updatedNotes = {
-                    allergy: notes?.allergy?.split(',').map((item: any) => item.trim()),
-                    bloodType: notes?.bloodType
-                  };
-                  await updateNotes(notes.id, updatedNotes, token);
-            }else{
-          // Salvar as notas do paciente
-                  const createNotesDate = {
-                    userId: patientId,
-                    allergy: notes?.allergy?.split(',').map((item: any) => item.trim()),
-                    bloodType: notes?.bloodType
-                  };
-                  await createNotes(createNotesDate, token);
-            }
-     
-
-          if (updated.status === 200 || updated.status === 204) {
-            window.location.reload();
-          } else {
-            console.warn("Erro ao atualizar paciente:", updated);
-          }
-        }
+        roleMessage = "Já existe um usuário cadastrado com esse CPF.";
       }
 
-    } catch (error) {
-      console.error("Erro ao salvar paciente:", error);
+      setAlertMessage(roleMessage);
+      setAlertOpen(true);
+      setShowConfirm(false);
+      return;
     }
-  }, [token, slug, patient, address, notes, createUser, createAddress, updatePatient, updateAddress, updateNotes, createPatientNotes, router]);
+
+    if (slug === "new") {
+      const newPatient = {
+        ...patient,
+        roleId: 3,
+      };
+
+      const newUser = await createUser(token, newPatient);
+
+      if (newUser.status !== 201) {
+        setSuccessMessage("Erro ao criar paciente.");
+        setIsSuccessOpen(true);
+        return;
+      }
+
+      const addressPayload = {
+        ...address,
+        userId: newUser.data.id,
+      };
+      await createAddress(token, addressPayload);
+
+      const patientNotes = {
+        userId: newUser.data.id,
+        allergy: notes?.allergy?.split(',').map((item: any) => item.trim()),
+        bloodType: notes?.bloodType,
+      };
+      await createPatientNotes(token, patientNotes);
+
+      setSuccessMessage("Paciente cadastrado com sucesso!");
+
+    } else {
+      const id = Number(slug);
+
+      if (isNaN(id)) {
+        setAlertMessage("ID do paciente inválido.");
+        setAlertOpen(true);
+        return;
+      }
+
+      const updated = await updatePatient(id, patient, token);
+
+      if (address.id) {
+        await updateAddress(address.id, { ...address }, token);
+      } else {
+        const newAddress = {
+          userId: id,
+          zipCode: address.zipCode,
+          street: address.street,
+          neighborhood: address.neighborhood,
+          city: address.city,
+          state: address.state,
+        };
+        await createAddress(token, newAddress);
+      }
+
+      if (notes.id) {
+        const updatedNotes = {
+          allergy: notes?.allergy?.split(',').map((item: any) => item.trim()),
+          bloodType: notes?.bloodType,
+        };
+        await updateNotes(notes.id, updatedNotes, token);
+      } else {
+        const createNotesData = {
+          userId: id,
+          allergy: notes?.allergy?.split(',').map((item: any) => item.trim()),
+          bloodType: notes?.bloodType,
+        };
+        await createNotes(createNotesData, token);
+      }
+
+      if (updated.status === 200 || updated.status === 204) {
+        setSuccessMessage("Paciente atualizado com sucesso!");
+      } else {
+        setSuccessMessage("Erro ao atualizar paciente.");
+      }
+    }
+
+    setIsSuccessOpen(true);
+    setShowConfirm(false);
+
+  } catch (error) {
+    console.error("Erro ao salvar paciente:", error);
+    setSuccessMessage("Erro ao salvar dados.");
+    setIsSuccessOpen(true);
+    setShowConfirm(false);
+  }
+}, [
+  token,
+  slug,
+  patient,
+  address,
+  notes,
+  createUser,
+  createAddress,
+  updatePatient,
+  updateAddress,
+  updateNotes,
+  createPatientNotes,
+  createNotes,
+  searchRegisterUser
+]);
 
   const fetchAddressByCep = async (cep: any) => {
-     if (cep.length < 8) return
+    if (cep.length < 8) return
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
       const data = await response.json();
@@ -118,13 +179,15 @@ export default function Patient() {
           state: data.uf !== "" ? data.uf : "",
         }));
       } else {
-        console.error("CEP não encontrado");
+        setAlertMessage("CEP não encontrado!");
+        setAlertOpen(true);
+        return
       }
     } catch (error) {
       console.error("Erro ao buscar endereço:", error);
     }
   };
-  
+
   const handleLoadingData = useCallback(async () => {
     if (!token || slug === "new") return;
 
@@ -149,6 +212,24 @@ export default function Patient() {
       handleLoadingData();
     }
   }, [token, slug, handleLoadingData]);
+
+  const handleCloseSuccess = () => {
+    setIsSuccessOpen(false);
+    router.push("/patients");
+  };
+
+  const submitForm = useCallback((event: any) => {
+    event.preventDefault();
+    setShowConfirm(true);
+  }, []);
+
+  function formatPhoneNumber(value: string): string {
+    const digits = value.replace(/\D/g, '').slice(0, 11);
+
+    if (digits.length <= 2) return `(${digits}`;
+    if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  }
 
   return (
     <Layout>
@@ -232,12 +313,14 @@ export default function Patient() {
                   value={patient?.document ?? ""}
                   disabled={!isEditing}
                   required
-                  onChange={(event) =>
+                  maxLength={11}
+                  onChange={(event) => {
+                    const onlyNumbers = event.target.value.replace(/\D/g, '').slice(0, 11);
                     setPatient((oldValue: any) => ({
                       ...oldValue,
-                      document: event.target.value
-                    }))
-                  }
+                      document: onlyNumbers
+                    }));
+                  }}
                 />
               </div>
 
@@ -301,18 +384,20 @@ export default function Patient() {
                 </label>
                 <input
                   type="text"
-                  className={`w-full px-6 py-4 rounded-lg text-lg focus:outline-none ${!isEditing ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : ''}`}
-                  id="telefone"
-                  aria-label="TELEFONE"
                   value={patient?.phoneNumber ?? ""}
                   disabled={!isEditing}
-                  required
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const formatted = formatPhoneNumber(event.target.value);
                     setPatient((oldValue: any) => ({
                       ...oldValue,
-                      phoneNumber: event.target.value
-                    }))
-                  }
+                      phoneNumber: formatted,
+                    }));
+                  }}
+                  className={`w-full px-6 py-4 rounded-lg text-lg focus:outline-none ${!isEditing ? "bg-gray-300 text-gray-500 cursor-not-allowed" : ""
+                    }`}
+                  id="telefone"
+                  required
+                  aria-label="TELEFONE"
                 />
               </div>
             </div>
@@ -416,7 +501,7 @@ export default function Patient() {
                   value={address?.zipCode ?? ""}
                   disabled={!isEditing}
                   required
-                   onChange={(e) => {
+                  onChange={(e) => {
                     const rawValue = e.target.value;
                     const numericValue = rawValue.replace(/\D/g, '').slice(0, 8); // remove não dígitos e limita a 8
                     fetchAddressByCep(numericValue);
@@ -424,7 +509,7 @@ export default function Patient() {
                       ...prev,
                       zipCode: numericValue,
                     }));
-                  }}                
+                  }}
                 />
               </div>
 
@@ -561,6 +646,29 @@ export default function Patient() {
                   <span className="ml-2">SALVAR</span>
                 </button>
               )}
+
+              {/* ConfirmationBox aparece só se showConfirm for true */}
+              {showConfirm && (
+                <ConfirmationBox
+                  isOpen={showConfirm}
+                  message="Deseja realmente confirmar a operação ?"
+                  onConfirm={handleConfirmedSubmit}
+                  onCancel={() => setShowConfirm(false)}
+                />
+              )}
+
+              <SuccessBox
+                isOpen={isSuccessOpen}
+                message={successMessage}
+                onClose={handleCloseSuccess}
+              />
+
+              <AlertBox
+                isOpen={alertOpen} // em vez de isAlertOpen
+                message={alertMessage}
+                onClose={() => setAlertOpen(false)} // em vez de setIsAlertOpen
+              />
+
             </div>
           </div>
         </form>

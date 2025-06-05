@@ -6,51 +6,123 @@ import { useCallback, useEffect, useState } from "react";
 import { useServiceContext } from "@/context/service";
 import { useAuth } from "@/context/auth";
 import ButtonSelector from "@/components/button-selector";
+import ConfirmationBox from "@/components/confirmation-box";
+import SuccessBox from "@/components/success-box";
+import AlertBox from "@/components/alert-box";
 
 export default function Services() {
   const router = useRouter();
   const params = useParams();
   const { slug } = params;
   const { token } = useAuth();
-  const { createServices, updateService, getServicesById } = useServiceContext();
+  const { createServices, updateService, getServicesById, listServices } = useServiceContext();
+
   const [service, setService] = useState<any>(null);
-  const [isEditing, setIsEditing] = useState(slug === 'new');
+  const [isEditing, setIsEditing] = useState(slug === "new");
+  const [showConfirm, setShowConfirm] = useState(false);
 
-  const submitForm = useCallback(async (event: any) => {
-    event.preventDefault();
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
-    try {
-      if (!token || !service) return;
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
 
-      if (slug === "new") {
-        const newService = await createServices(service, token);
+  const handleCloseSuccess = () => {
+    setIsSuccessOpen(false);
+    router.push("/services");
+  };
 
-      } else {
-        const id = Number(slug);
-        if (!isNaN(id)) {
-          const updatedService = await updateService(id, service, token);
-        }
+  const handleConfirmedSubmit = useCallback(async () => {
+  try {
+    if (!token || !service) return;
+
+    const serviceCode = String(service.code).trim().toLowerCase();
+
+    const allServicesResponse = await listServices(token);
+    const allServices = allServicesResponse?.data ?? [];
+
+    if (slug === "new") {
+      const codeAlreadyExists = allServices.some((s: any) => {
+        const existingCode = String(s.code).trim().toLowerCase();
+        return existingCode === serviceCode;
+      });
+
+      if (codeAlreadyExists) {
+        setAlertMessage("Já existe um serviço cadastrado com esse código!");
+        setAlertOpen(true);
+        setShowConfirm(false);
+        return;
       }
-      window.location.pathname = "services";
-    } catch (error) {
-      console.log(error);
+
+      const response = await createServices(service, token);
+      if (response?.status === 201) {
+        setSuccessMessage("Serviço criado com sucesso!");
+        setIsSuccessOpen(true);
+      } else {
+        console.error("Erro ao criar serviço:", response);
+        setAlertMessage("Erro ao criar serviço. Tente novamente.");
+        setAlertOpen(true);
+      }
+    } else {
+      const id = Number(slug);
+      if (!isNaN(id)) {
+        // ✅ Verificação de código duplicado excluindo o próprio serviço
+        const codeAlreadyExists = allServices.some((s: any) => {
+          const existingCode = String(s.code).trim().toLowerCase();
+          return existingCode === serviceCode && s.id !== id;
+        });
+
+        if (codeAlreadyExists) {
+          setAlertMessage("Já existe um serviço cadastrado com esse código!");
+          setAlertOpen(true);
+          setShowConfirm(false);
+          return;
+        }
+
+        const response = await updateService(id, service, token);
+        if (response?.status === 200 || response?.status === 204) {
+          setSuccessMessage("Serviço atualizado com sucesso!");
+          setIsSuccessOpen(true);
+        } else {
+          console.error("Erro ao atualizar serviço:", response);
+          setAlertMessage("Erro ao atualizar serviço. Tente novamente.");
+          setAlertOpen(true);
+        }
+      } else {
+        setAlertMessage("ID de serviço inválido.");
+        setAlertOpen(true);
+      }
     }
-  }, [service, token, slug, createServices, updateService]);
+
+    setShowConfirm(false);
+  } catch (error) {
+    console.error(error);
+    setAlertMessage("Erro inesperado. Tente novamente.");
+    setAlertOpen(true);
+    setShowConfirm(false);
+  }
+}, [service, token, slug, createServices, updateService, listServices]);
+
+
+  const submitForm = useCallback((event: any) => {
+    event.preventDefault();
+    setShowConfirm(true);
+  }, []);
 
   const handlesLoadingData = useCallback(async () => {
     const id = Number(slug);
 
-    if (slug && typeof id === "number" && slug != 'new') {
-      const serviceData = await getServicesById(token, +slug);
+    if (slug && typeof id === "number" && slug !== "new") {
+      const serviceData = await getServicesById(token, id);
 
-      if (!serviceData?.data && serviceData.status != 200) return;
+      if (!serviceData?.data && serviceData.status !== 200) return;
       setService(serviceData?.data);
     }
-  }, [token, setService, getServicesById, slug]);
+  }, [token, getServicesById, slug]);
 
   useEffect(() => {
     handlesLoadingData();
-  }, [token, handlesLoadingData]);
+  }, [handlesLoadingData]);
 
   return (
     <Layout>
@@ -115,7 +187,7 @@ export default function Services() {
                 onChange={(event) =>
                   setService((oldValue: any) => ({
                     ...oldValue,
-                    code: event.target.value
+                    code: event.target.value.slice(0, 8)
                   }))
                 }
               />
@@ -153,19 +225,25 @@ export default function Services() {
                 <span className="text-black"> Valor:</span>
               </label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 required
-                value={service?.price ?? ''}
+                value={service?.price !== undefined
+                  ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(service.price)
+                  : ''}
                 className={`w-full px-6 py-4 rounded-lg text-lg focus:outline-none ${!isEditing ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : ''}`}
                 id="valor"
                 disabled={!isEditing}
                 aria-label="valor"
-                onChange={(event) =>
+                onChange={(event) => {
+                  const rawValue = event.target.value.replace(/\D/g, '');
+                  const numericValue = Number(rawValue) / 100;
+
                   setService((oldValue: any) => ({
                     ...oldValue,
-                    price: event.target.value
-                  }))
-                }
+                    price: numericValue  // ✅ armazenando como número
+                  }));
+                }}
               />
             </div>
           </div>
@@ -196,7 +274,7 @@ export default function Services() {
           <div className="w-3/4 flex justify-center mt-[60px] ml-[70px] mb-3">
             <button
               type="button"
-              onClick={() => router.back()}
+              onClick={() => router.push('/services')} // navega pra lista
               className="px-4 py-2.5 mr-4 rounded-md bg-[#5D7285] hover:bg-[#4c5e6e] text-white text-[15px] font-semibold transition-colors flex items-center gap-2"
             >
               <svg width="20" height="20" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
@@ -225,6 +303,29 @@ export default function Services() {
                 <span className="ml-2">SALVAR</span>
               </button>
             )}
+
+            {/* ConfirmationBox aparece só se showConfirm for true */}
+            {showConfirm && (
+              <ConfirmationBox
+                isOpen={showConfirm}
+                message="Deseja realmente confirmar a operação ?"
+                onConfirm={handleConfirmedSubmit}
+                onCancel={() => setShowConfirm(false)}
+              />
+            )}
+
+            <SuccessBox
+              isOpen={isSuccessOpen}
+              message={successMessage}
+              onClose={handleCloseSuccess}
+            />
+
+            <AlertBox
+              isOpen={alertOpen} 
+              message={alertMessage}
+              onClose={() => setAlertOpen(false)} 
+            />
+
           </div>
         </div>
       </form>

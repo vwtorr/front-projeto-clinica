@@ -3,18 +3,14 @@ import { useState } from "react";
 
 interface TableProps {
   data: any;
-  onDelete?: (id: number) => void;
+  isSuccessOpen?: boolean;
+  onCloseSuccess?: () => void;
 }
 
-export function TableServices({ data, onDelete }: TableProps) {
+
+export function TableServices({ data }: TableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
-
-  const handleDelete = (id: number) => {
-    if (onDelete) {
-      onDelete(id);
-    }
-  };
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -35,8 +31,8 @@ export function TableServices({ data, onDelete }: TableProps) {
             <th className="text-gray-500 border p-2" scope="col">Código</th>
             <th className="text-gray-500 border p-2" scope="col">Nome</th>
             <th className="text-gray-500 border p-2" scope="col">Descrição</th>
-            <th className="text-gray-500 border p-2" scope="col">Valor</th>
             <th className="text-gray-500 border p-2" scope="col">Status</th>
+            <th className="text-gray-500 border p-2" scope="col">Valor</th>
             <th className="text-gray-500 border p-2" scope="col">Ações</th>
           </tr>
         </thead>
@@ -48,16 +44,21 @@ export function TableServices({ data, onDelete }: TableProps) {
                 className="cursor-pointer hover:bg-gray-100 border-b border-gray-300"
               >
                 <td className="text-center py-4">{item?.code}</td>
-                <td className="text-center py-4">{item?.name}</td>
-                <td className="text-center py-4">{item?.description}</td>
                 <td className="text-center py-4">
-                  {!isNaN(Number(item?.price))
-                    ? Number(item.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-                    : (0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-                  }
+                  {item?.name
+                    ? item.name.trim().length > 15
+                      ? item.name.trim().slice(0, 15) + '...'
+                      : item.name.trim()
+                    : '-'}
                 </td>
-
-                <td className="text-center py-4 border-r">
+                <td className="text-center py-4">
+                  {item?.description
+                    ? item.description.trim().length > 20
+                      ? item.description.trim().slice(0, 20) + '...'
+                      : item.description.trim()
+                    : '-'}
+                </td>
+                <td className="text-center py-4">
                   <div
                     className={`${item?.status ? "bg-green-400" : "bg-red-400"
                       } rounded-2xl px-4 py-2 text-white flex justify-center items-center gap-4`}
@@ -69,6 +70,13 @@ export function TableServices({ data, onDelete }: TableProps) {
                     {item?.status ? "Ativo" : "Desativado"}
                   </div>
                 </td>
+                <td className="text-center py-4 border-r">
+                  {!isNaN(Number(item?.price))
+                    ? Number(item.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                    : (0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                  }
+                </td>
+
                 <td
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -89,26 +97,6 @@ export function TableServices({ data, onDelete }: TableProps) {
                         </svg>
                       </Link>
                     </div>
-
-                    <button
-                      className="w-8 h-8 flex items-center justify-center hover:text-red-500"
-                      onClick={() => handleDelete(item?.id)}
-                    >
-                      <svg
-                        aria-hidden="true"
-                        fill="none"
-                        strokeWidth="1.5"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </button>
                   </div>
                 </td>
               </tr>

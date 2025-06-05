@@ -77,7 +77,6 @@ export default function ListServices() {
       </section>
       <TableServices
         data={services}
-        onDelete={(id: number) => handleDelete(id)}
       />
     </Layout>
   );

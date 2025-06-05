@@ -1,4 +1,4 @@
-"use client"
+"use client";
 import { del, get, post, put } from "@/config/api";
 import React, { useMemo, useContext, ReactNode, useCallback } from "react";
 
@@ -6,9 +6,11 @@ export interface ExamContextProps {
   listExam: (token: string) => Promise<any>;
   deleteExam: (token: string, id: number) => Promise<any>;
   createExam: (token: string, data: any) => Promise<any>;
+  updateExam: (id: number, token: string, data: any) => Promise<any>;
   searchRegister: (token: string, search?: string, initialDate?: string, finalDate?: string) => Promise<any>;
   getExams: (token: string, id: number) => Promise<any>;
-  updateExam: ( id: number, token: string, data: any) => Promise<any>;
+  getExamById: (token: string, examId: number) => Promise<any>; // 👈 novo método
+  getExamView: (token: string, id: number, date: string) => Promise<any>; // 👈 novo método
 }
 
 interface Props {
@@ -34,8 +36,18 @@ export const ExamProvider: React.FC<Props> = ({ children }) => {
     return response;
   }, []);
 
-  const getExams = useCallback(async (token: string, id: any): Promise<any> => {
+  const getExams = useCallback(async (token: string, id: number): Promise<any> => {
     const response = await get(`patients-exams/group-by-user-id/${id}`, token);
+    return response;
+  }, []);
+
+  const getExamById = useCallback(async (token: string, examId: number): Promise<any> => {
+    const response = await get(`patients-exams/${examId}`, token); // 👈 ajusta conforme rota da sua API
+    return response;
+  }, []);
+
+    const getExamView = useCallback(async (token: string, id: number, date: string): Promise<any> => {
+    const response = await get(`patients-exams/group-by-user-id/${id}/${date}`, token); // 👈 ajusta conforme rota da sua API
     return response;
   }, []);
 
@@ -55,8 +67,10 @@ export const ExamProvider: React.FC<Props> = ({ children }) => {
     searchRegister,
     updateExam,
     createExam,
-    getExams
-  }), [listExam,updateExam, searchRegister, deleteExam, createExam, getExams]);
+    getExams,
+    getExamById,
+    getExamView
+  }), [listExam, updateExam, searchRegister, deleteExam, createExam, getExams, getExamById, getExamView]);
 
   return <ExamContext.Provider value={value}>{children}</ExamContext.Provider>;
 };

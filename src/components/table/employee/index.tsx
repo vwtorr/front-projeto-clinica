@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import ConfirmationBox from "@/components/confirmation-box";
+import SuccessBox from "@/components/success-box";
 
 interface TableProps {
   data: any[];
@@ -10,6 +12,9 @@ interface TableProps {
 export function TableEmployee({ data, onDelete, onEdit }: TableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [currentData, setCurrentData] = useState<any[]>([]);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+
   const itemsPerPage = 6;
 
   const totalPages = Math.ceil(data.length / itemsPerPage);
@@ -25,11 +30,32 @@ export function TableEmployee({ data, onDelete, onEdit }: TableProps) {
     setCurrentPage(page);
   };
 
-  const handleDelete = (id: number) => {
-    if (onDelete) {
-      onDelete(id);
-    }
+
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+
+  const handleDeleteClick = (id: number) => {
+    setSelectedId(id);
+    setIsConfirmOpen(true);
   };
+
+  const handleConfirmDelete = () => {
+    if (selectedId !== null && onDelete) {
+      onDelete(selectedId);
+      setIsSuccessOpen(true);
+    }
+    setIsConfirmOpen(false);
+    setSelectedId(null);
+  };
+
+  const handleCancelDelete = () => {
+    setIsConfirmOpen(false);
+    setSelectedId(null);
+  };
+
+  const handleCloseSuccess = () => {
+    setIsSuccessOpen(false);
+  };
+
 
   const isNoData = data.length === 0;
 
@@ -38,10 +64,10 @@ export function TableEmployee({ data, onDelete, onEdit }: TableProps) {
       <table className="w-full border-collapse border border-gray-200">
         <thead>
           <tr>
-            <th className="text-gray-500 border p-2">Nome</th>
-            <th className="text-gray-500 border p-2">E-mail</th>
-            <th className="text-gray-500 border p-2">Telefone</th>
             <th className="text-gray-500 border p-2">CPF</th>
+            <th className="text-gray-500 border p-2">Nome</th>
+            <th className="text-gray-500 border p-2">Email</th>
+            <th className="text-gray-500 border p-2">Telefone</th>
             <th className="text-gray-500 border p-2">Status</th>
             <th className="text-gray-500 border p-2">Ações</th>
           </tr>
@@ -57,10 +83,22 @@ export function TableEmployee({ data, onDelete, onEdit }: TableProps) {
           ) : (
             currentData.map((item: any) => (
               <tr key={item.id} className="hover:bg-gray-100">
-                <td className="text-center py-4">{item?.name}</td>
-                <td className="text-center py-4">{item?.email}</td>
-                <td className="text-center py-4">{item?.phoneNumber}</td>
                 <td className="text-center py-4">{item?.document}</td>
+                <td className="text-center py-4">
+                  {item?.name
+                    ? item.name.length > 20
+                      ? item.name.slice(0, 20) + '...'
+                      : item.name
+                    : '-'}
+                </td>
+                <td className="text-center py-4">
+                  {item?.email
+                    ? item.email.length > 40
+                      ? item.email.slice(0, 40) + '...'
+                      : item.email
+                    : '-'}
+                </td>
+                <td className="text-center py-4">{item?.phoneNumber}</td>
                 <td className="text-center py-4 border-r">
                   <div
                     className={`${item?.status ? "bg-green-400" : "bg-red-400"
@@ -92,7 +130,7 @@ export function TableEmployee({ data, onDelete, onEdit }: TableProps) {
                       </Link>
                     </div>
 
-                    <div className="w-8 h-8 flex items-center justify-center cursor-pointer hover:text-red-500" onClick={() => handleDelete(item?.id)}>
+                    <div className="w-8 h-8 flex items-center justify-center cursor-pointer hover:text-red-500" onClick={() => handleDeleteClick(item?.id)}>
                       <svg
                         data-slot="icon"
                         aria-hidden="true"
@@ -117,6 +155,19 @@ export function TableEmployee({ data, onDelete, onEdit }: TableProps) {
         </tbody>
       </table>
 
+      <ConfirmationBox
+        isOpen={isConfirmOpen}
+        message="Tem certeza que deseja excluir este funcionário?"
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
+
+      <SuccessBox
+        isOpen={isSuccessOpen}
+        message="Funcionário excluído com sucesso!"
+        onClose={handleCloseSuccess}
+      />
+
       {/* Paginação */}
       {!isNoData && (
         <div className="flex justify-end mt-4">
@@ -136,8 +187,8 @@ export function TableEmployee({ data, onDelete, onEdit }: TableProps) {
                 <li key={i}>
                   <button
                     className={`px-3 py-1 ${currentPage === i + 1
-                        ? "bg-blue-500 text-white"
-                        : "bg-gray-200 text-black hover:bg-gray-300"
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-200 text-black hover:bg-gray-300"
                       } transition`}
                     onClick={() => handlePageChange(i + 1)}
                   >

@@ -91,7 +91,7 @@ export const UserProvider: React.FC<Props> = ({ children }) => {
   }, []);
 
   const createPatientNotes = useCallback(async (token: string, data: any): Promise<any> => {
-    const response = await post(`patient_notes`, data, token);
+    const response = await post(`patients-notes`, data, token);
     return response;
   }, []);
 
@@ -110,8 +110,8 @@ export const UserProvider: React.FC<Props> = ({ children }) => {
     return response;
   }, []);
 
-  const getUserById = useCallback(async (token: string, id: number): Promise<any> => {  // Adicionada
-    const response = await get(`users/users/${id}`, token);  // Implementação da função
+  const getUserById = useCallback(async (token: string, id: number): Promise<any> => { 
+    const response = await get(`users/users/${id}`, token); 
     return response;
   }, []);
 

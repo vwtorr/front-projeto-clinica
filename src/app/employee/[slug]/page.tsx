@@ -6,6 +6,10 @@ import { useCallback, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/auth";
 import { useUserContext } from "@/context/user";
+import ConfirmationBox from "@/components/confirmation-box";
+import SuccessBox from "@/components/success-box";
+import AlertBox from "@/components/alert-box";
+
 
 export default function EmployeerRegistration() {
   const router = useRouter();
@@ -18,7 +22,8 @@ export default function EmployeerRegistration() {
     updatePatient,
     updateAddress,
     updatePositions,
-    createPositions
+    createPositions,
+    searchRegisterUser
   } = useUserContext();
 
   const [employee, setEmployee] = useState<any>(null);
@@ -26,6 +31,11 @@ export default function EmployeerRegistration() {
   const params = useParams();
   const employeeId = params?.slug;
   const [isEditing, setIsEditing] = useState(employeeId === 'new');
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
 
   const [cep, setCep] = useState('');
   const [address, setAddress] = useState<any>({
@@ -37,7 +47,7 @@ export default function EmployeerRegistration() {
   });
 
   const fetchAddressByCep = async (cep: any) => {
-     if (cep.length < 8) return
+    if (cep.length < 8) return
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
       const data = await response.json();
@@ -51,91 +61,165 @@ export default function EmployeerRegistration() {
           state: data.uf !== "" ? data.uf : "",
         }));
       } else {
-        console.error("CEP não encontrado");
+        setAlertMessage("CEP não encontrado!");
+        setAlertOpen(true);
+        return
       }
+
     } catch (error) {
       console.error("Erro ao buscar endereço:", error);
     }
   };
   
-  const submitForm = useCallback(
-    async (event: any) => {
-      event.preventDefault();
 
-      try {
-        if (employeeId == "new") {
-          if (!token || !employee) return;
+  const submitForm = useCallback((event: any) => {
+    event.preventDefault();
+    setShowConfirm(true);
+  }, []);
 
-          const newEmployee = await createUser(token, employee);
-          const status = newEmployee.status;
 
-          if (status !== 201) {
-            return;
-          } else {
+  const handleConfirmedSubmit = useCallback(async () => {
+    try {
 
-            const newAddress = {
-              userId: newEmployee?.data?.id,
-              zipCode: address.zipCode,
-              street: address.street,
-              neighborhood: address.neighborhood,
-              city: address.city,
-              state: address.state,
-            };
+      setShowConfirm(false);
 
-            await createAddress(token, newAddress);
+      if (!token || !employee) return;
 
-            const newEmployeeData = {
-              userId: newEmployee?.data?.id,
-              ...positions,
-            };
-            await createEmployeeData(token, newEmployeeData);
-          }
-          window.location.pathname = "employees";
-        } else {
-          const id = Number(employeeId);
-          if (typeof id === "number" && employeeId !== 'new') {
-            const updatedService = await updatePatient(id, employee, token);
-            if (address.id) {
-              await updateAddress(address.id, {
-                ...address,
-                zipCode: address.zipCode,
-              }, token);
-            } else {
-               const newAddress = {
-                  userId: employee?.id,
-                  zipCode: address.zipCode,
-                  street: address.street,
-                  neighborhood: address.neighborhood,
-                  city: address.city,
-                  state: address.state,
-                };
-
-                await createAddress(token, newAddress);   
-            }
-           
-            if(positions.id){
-              await updatePositions(positions.id, positions, token);
-            }else{
-              const data = {
-                userId: employeeId,
-                ...positions,
-              }
-              await createPositions(data, token);
-            }
-      
-            if (updatedService.status === 200 || updatedService.status === 204) {
-              window.location.reload();
-            } else {
-              console.error('Erro ao atualizar serviço:', updatedService);
-            }
-          }
-        }
-      } catch (error) {
-        console.log(error);
+      if (employee?.document.length !== 11) {
+        setAlertMessage("O CPF deve conter exatamente 11 dígitos.");
+        setAlertOpen(true);
+        return;
       }
-    },
-    [employee, token, router, setEmployee, createUser, createAddress, createEmployeeData, updateAddress, address, updatePositions, positions]
-  );
+
+      if (employeeId === "new") {
+        // Verifica se já existe usuário com o mesmo CPF/document E mesmo role_id
+        const existingUsers = await searchRegisterUser(token, "users", employee.document);
+
+        const cpfJaExiste = existingUsers?.data?.some(
+          (user: any) => user.role_id === employee.role_id
+        );
+
+        if (cpfJaExiste) {
+          setAlertMessage("Já existe um funcionário cadastrado com esse CPF.");
+          setAlertOpen(true);
+          setShowConfirm(false);
+          return;
+        }
+
+        const newEmployee = await createUser(token, employee);
+
+        if (newEmployee.status !== 201) {
+          setSuccessMessage("Erro ao criar funcionário.");
+          setIsSuccessOpen(true);
+          return;
+        }
+
+        const newAddress = {
+          userId: newEmployee?.data?.id,
+          zipCode: address.zipCode,
+          street: address.street,
+          neighborhood: address.neighborhood,
+          city: address.city,
+          state: address.state,
+        };
+        await createAddress(token, newAddress);
+
+        const newEmployeeData = {
+          userId: newEmployee?.data?.id,
+          ...positions,
+        };
+        await createEmployeeData(token, newEmployeeData);
+
+        setSuccessMessage("Funcionário cadastrado com sucesso!");
+
+      } else {
+        const id = Number(employeeId);
+
+        // ✅ Verifica se já existe usuário com o mesmo CPF/document e mesmo role_id, mas ID diferente
+        const existingUsers = await searchRegisterUser(token, "users", employee.document);
+
+        const cpfJaExiste = existingUsers?.data?.find(
+          (user: any) => user.id !== employee.id && user.role_id === employee.role_id
+        );
+
+        if (cpfJaExiste) {
+          console.log("Usuário encontrado:", cpfJaExiste);  // Só pra garantir
+
+          let roleMessage = "";
+
+          if (cpfJaExiste.roleId === 1) {
+            roleMessage = "Já existe um administrador cadastrado com esse CPF.";
+          } else if (cpfJaExiste.roleId === 2) {
+            roleMessage = "Já existe um funcionário cadastrado com esse CPF.";
+          } else if (cpfJaExiste.roleId === 3) {
+            roleMessage = "Já existe um paciente cadastrado com esse CPF.";
+          } else {
+            roleMessage = "Já existe um usuário cadastrado com esse CPF.)";
+          }
+
+          setAlertMessage(roleMessage);
+          setAlertOpen(true);
+          setShowConfirm(false);
+          return;
+        }
+
+        const updatedService = await updatePatient(id, employee, token);
+
+        if (address.id) {
+          await updateAddress(address.id, { ...address }, token);
+        } else {
+          const newAddress = {
+            userId: employee?.id,
+            zipCode: address.zipCode,
+            street: address.street,
+            neighborhood: address.neighborhood,
+            city: address.city,
+            state: address.state,
+          };
+          await createAddress(token, newAddress);
+        }
+
+        if (positions.id) {
+          await updatePositions(positions.id, positions, token);
+        } else {
+          const data = {
+            userId: employeeId,
+            ...positions,
+          };
+          await createPositions(data, token);
+        }
+
+        if (updatedService.status === 200 || updatedService.status === 204) {
+          setSuccessMessage("Funcionário atualizado com sucesso!");
+        } else {
+          setSuccessMessage("Erro ao atualizar funcionário.");
+        }
+      }
+
+      setIsSuccessOpen(true);
+      setShowConfirm(false);
+    } catch (error) {
+      console.log(error);
+      setSuccessMessage("Erro ao salvar dados.");
+      setIsSuccessOpen(true);
+      setShowConfirm(false);
+    }
+  }, [
+    employee,
+    token,
+    employeeId,
+    createUser,
+    createAddress,
+    createEmployeeData,
+    updatePatient,
+    address,
+    updateAddress,
+    positions,
+    updatePositions,
+    createPositions,
+    searchRegisterUser,
+  ]);
+
 
   const handleLoadingData = useCallback(async () => {
     if (!token || !employeeId) return;
@@ -155,6 +239,19 @@ export default function EmployeerRegistration() {
   useEffect(() => {
     handleLoadingData();
   }, [handleLoadingData]);
+
+  const handleCloseSuccess = () => {
+    setIsSuccessOpen(false);
+    router.push("/employees");
+  };
+
+  function formatPhoneNumber(value: string): string {
+    const digits = value.replace(/\D/g, '').slice(0, 11);
+
+    if (digits.length <= 2) return `(${digits}`;
+    if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  }
 
   return (
     <Layout>
@@ -238,12 +335,14 @@ export default function EmployeerRegistration() {
                   value={employee?.document ?? ""}
                   disabled={!isEditing}
                   required
-                  onChange={(event) =>
+                  maxLength={11}
+                  onChange={(event) => {
+                    const onlyNumbers = event.target.value.replace(/\D/g, '').slice(0, 11);
                     setEmployee((oldValue: any) => ({
                       ...oldValue,
-                      document: event.target.value
-                    }))
-                  }
+                      document: onlyNumbers
+                    }));
+                  }}
                 />
               </div>
               <div className="w-1/2 mt-8">
@@ -307,13 +406,15 @@ export default function EmployeerRegistration() {
                   type="text"
                   value={employee?.phoneNumber ?? ""}
                   disabled={!isEditing}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const formatted = formatPhoneNumber(event.target.value);
                     setEmployee((oldValue: any) => ({
                       ...oldValue,
-                      phoneNumber: event.target.value
-                    }))
-                  }
-                  className={`w-full px-6 py-4 rounded-lg text-lg focus:outline-none ${!isEditing ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : ''}`}
+                      phoneNumber: formatted,
+                    }));
+                  }}
+                  className={`w-full px-6 py-4 rounded-lg text-lg focus:outline-none ${!isEditing ? "bg-gray-300 text-gray-500 cursor-not-allowed" : ""
+                    }`}
                   id="telefone"
                   required
                   aria-label="TELEFONE"
@@ -345,9 +446,6 @@ export default function EmployeerRegistration() {
                 />
               </div>
 
-            </div>
-
-            <div className="flex gap-12 mb-5">
               <div className="w-1/2">
                 <label
                   htmlFor="salario"
@@ -358,21 +456,33 @@ export default function EmployeerRegistration() {
                 </label>
                 <input
                   type="text"
+                  inputMode="numeric"
                   className={`w-full px-6 py-4 rounded-lg text-lg focus:outline-none ${!isEditing ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : ''}`}
                   id="salario"
-                  value={positions?.remuneration ?? ""}
+                  value={
+                    positions?.remuneration !== undefined && positions?.remuneration !== null
+                      ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(positions.remuneration)
+                      : ''
+                  }
                   disabled={!isEditing}
                   required
                   aria-label="SALÁRIO"
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const rawValue = event.target.value.replace(/\D/g, '');
+                    const numericValue = Number(rawValue) / 100;
+
                     setPositions((oldValue: any) => ({
                       ...oldValue,
-                      remuneration: event.target.value
-                    })) 
-                  }
+                      remuneration: numericValue,
+                    }));
+                  }}
                 />
               </div>
-              <div className="w-1/2">
+            </div>
+
+            <div className="flex gap-12 mb-5">
+
+              <div className="w-full">
                 <label
                   htmlFor="email"
                   className="block mb-1 text-xl font-medium required"
@@ -397,7 +507,6 @@ export default function EmployeerRegistration() {
               </div>
             </div>
 
-
           </div>
           <div className="w-[2px] h-[70vh] bg-black ml-10"></div>
           <div className="w-1/2">
@@ -416,7 +525,7 @@ export default function EmployeerRegistration() {
                   disabled={!isEditing}
                   onChange={(e) => {
                     const rawValue = e.target.value;
-                    const numericValue = rawValue.replace(/\D/g, '').slice(0, 8); // remove não dígitos e limita a 8
+                    const numericValue = rawValue.replace(/\D/g, '').slice(0, 8);
                     fetchAddressByCep(numericValue);
                     setAddress((prev: any) => ({
                       ...prev,
@@ -527,8 +636,29 @@ export default function EmployeerRegistration() {
                   <span className="ml-2">SALVAR</span>
                 </button>
               )}
-            </div>
 
+              {/* ConfirmationBox aparece só se showConfirm for true */}
+              {showConfirm && (
+                <ConfirmationBox
+                  isOpen={showConfirm}
+                  message="Deseja realmente confirmar a operação ?"
+                  onConfirm={handleConfirmedSubmit}
+                  onCancel={() => setShowConfirm(false)}
+                />
+              )}
+
+              <SuccessBox
+                isOpen={isSuccessOpen}
+                message={successMessage}
+                onClose={handleCloseSuccess}
+              />
+
+              <AlertBox
+                isOpen={alertOpen} // em vez de isAlertOpen
+                message={alertMessage}
+                onClose={() => setAlertOpen(false)} // em vez de setIsAlertOpen
+              />
+            </div>
           </div>
         </form>
 

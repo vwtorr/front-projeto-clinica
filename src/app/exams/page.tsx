@@ -14,7 +14,7 @@ export default function Exams() {
   const { token } = useAuth();
   const { listExam, searchRegister, deleteExam } = useExamContext();
   const [initialDate, setInitialDate] = useState<any>();
-  const [finalDate, setFinalDate] = useState<any>();
+  const [finalDate, setFinalDate] = useState<any>(); 
   const [exams, setExams] = useState<any>([]);
 
   const handlesListExams = useCallback(async () => {
@@ -25,11 +25,14 @@ export default function Exams() {
       if (data) {
         const groupedData = data?.reduce((acc: any, item: any) => {
           const date = new Date(item.dateTime).toISOString().split('T')[0];
+          const time = item.dateTime.split('T')[1];
           const key = `${date}_${item.user.name}`;
           if (!acc[key]) {
             acc[key] = {
               id: item.user.id,
               date,
+              time,
+              dateTime: item.dateTime,
               userName: item.user.name,
               total: 0,
               paymentStatus: item.paymentStatus,
@@ -37,7 +40,7 @@ export default function Exams() {
             };
           }
           acc[key].records.push(item);
-          acc[key].total += (+item.service.price); // Substitua 'value' pelo nome real do campo numérico
+          acc[key].total += (+item.service.price);
           return acc;
         }, {});
         const result = Object.values(groupedData);
@@ -50,18 +53,21 @@ export default function Exams() {
 
 
   const handleDelete = useCallback(async (items: any[]) => {
-    try {
-      if (!token) return;
-      console.clear();
-      console.log(items);
-      for(const item of items){
-         await deleteExam(token, item?.id);
-      }  
-      window.location.reload();
-    } catch (error) {
-      console.log(error);
+  try {
+    if (!token) return;
+    for (const item of items) {
+      await deleteExam(token, item?.id);
     }
-  }, [token, deleteExam]);
+
+    // Remove os itens deletados do estado local
+    setExams((prevExams: any) =>
+      prevExams.filter((exam: any) => exam.records !== items)
+    );
+  } catch (error) {
+    console.log(error);
+  }
+}, [token, deleteExam]);
+
 
   const handlesSearch = useCallback(async (search?: string) => {
     try {
@@ -86,7 +92,7 @@ export default function Exams() {
 
   return (
     <Layout>
-      <h1 className="text-4xl font-bold mb-8 text-[#5D7285]">Exames</h1>
+      <h1 className="text-4xl font-bold mb-8 text-[#5D7285]">Agendamento de Exames</h1>
       <div className="w-full h-[1px] my-8 bg-slate-400" ></div>
       <section className="flex flex-row gap-4 items-center  justify-between mb-4">
         <Input isFlex label="Buscar:" searchIcon type="search" placeholder="Buscar..." onChange={(event) => handlesSearch(event.target.value)} />

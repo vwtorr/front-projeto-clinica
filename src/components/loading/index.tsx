@@ -14,9 +14,8 @@ export default function Loading() {
           </svg>
         </div>
         <div className="text-2xl font-bold mb-5">
-          Operação esta sendo efetuada assim que concluir, voce sera redirecionado a pagina de listagem!
+          Aguarde enquanto o processo é realizado...
         </div>
-
       </div>
     </section>
   );

@@ -1,5 +1,5 @@
 "use client";
-import { get, post, del } from "@/config/api";
+import { get, post, del, put } from "@/config/api";
 import React, { useMemo, useContext, ReactNode, useCallback } from "react";
 
 export interface ExpenseContextProps {
@@ -8,8 +8,9 @@ export interface ExpenseContextProps {
   searchRegister: (token: string, search?: string, initialDate?: string, finalDate?: string) => Promise<any>;
   deleteExpense: (token: string, id: number) => Promise<any>;
   getExpenseById: (token: string, id: number) => Promise<any>;
+  updatePaymentStatus: (token: string, id: number, newStatus: string) => Promise<any>;
+  updateExpense: (token: string, id: number, data: any) => Promise<any>;  // <-- adicionada
 }
-
 
 interface Props {
   children: ReactNode;
@@ -43,14 +44,26 @@ export const ExpenseProvider: React.FC<Props> = ({ children }) => {
     return response;
   }, []);
 
+  const updatePaymentStatus = useCallback(async (token: string, id: number, newStatus: string): Promise<any> => {
+    const response = await put(`expenses/${id}`, { status: newStatus }, token);
+    return response;
+  }, []);
+
+  // Função para atualizar o título completo
+  const updateExpense = useCallback(async (token: string, id: number, data: any): Promise<any> => {
+    const response = await put(`expenses/${id}`, data, token);
+    return response;
+  }, []);
 
   const value = useMemo(() => ({
     listExpenses,
     searchRegister,
     createExpenses,
     deleteExpense,
-    getExpenseById
-  }), [listExpenses, createExpenses, deleteExpense, getExpenseById]);
+    getExpenseById,
+    updatePaymentStatus,
+    updateExpense,  // <-- adicionada aqui
+  }), [listExpenses, createExpenses, deleteExpense, getExpenseById, updatePaymentStatus, updateExpense]);
 
   return <ExpenseContext.Provider value={value}>{children}</ExpenseContext.Provider>;
 };
