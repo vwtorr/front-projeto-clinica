@@ -87,16 +87,15 @@ export default function Page() {
 
       setPopup(true);
 
-
       const existingExams = await getExamView(token, seletedPatient.id, slug[1] as string);
-      //const hasPendingExam = existingExams.data?.some((exam: any) => exam.statusExam === "PENDENTE");
-      //
-      //if (hasPendingExam) {
-      //  setAlertMessage("Este paciente já possui um exame com status 'PENDENTE'. Para continuar, edite ou conclua o exame existente.");
-      //  setAlertOpen(true);
-      //  setPopup(false);
-      //  return;
-      //}
+      const hasPendingExam = existingExams.data?.some((exam: any) => exam.statusExam === "PENDENTE");
+      
+      if (hasPendingExam) {
+       setAlertMessage("Este paciente já possui um exame com status 'PENDENTE'. Para continuar, edite ou conclua o exame existente.");
+       setAlertOpen(true);
+       setPopup(false);
+       return;
+      }
 
       const isEditingExam = slug[0] !== 'new';
 
