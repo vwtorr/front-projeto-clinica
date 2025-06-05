@@ -1,6 +1,6 @@
 import axios, { AxiosError } from "axios";
 
-const URL = process.env.NEXT_PUBLIC_API_URL;
+const URL = "https://back-projetoclinica.onrender.com";
 function identifyVariable(data: any) {
   if (data instanceof FormData) {
     return true;
