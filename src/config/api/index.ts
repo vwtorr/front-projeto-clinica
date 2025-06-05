@@ -1,6 +1,6 @@
 import axios, { AxiosError } from "axios";
 
-const URL = "https://back-projetoclinica.onrender.com";
+const URL = "https://back-projetoclinica.onrender.com/";
 function identifyVariable(data: any) {
   if (data instanceof FormData) {
     return true;
