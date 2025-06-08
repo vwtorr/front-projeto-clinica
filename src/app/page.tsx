@@ -15,10 +15,10 @@ export default function Home() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
-      const response: any = await signIn({
-        username,
-        password
-      });
+      const userData = {
+        email:username, password
+      }
+      const response: any = await signIn(userData);
 
       if (response.status != 200 || response.data.access_token == null) {
         setErrorLogin(true);
