@@ -34,6 +34,7 @@ export default function EmployeerRegistration() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertMessage, setAlertMessage] = useState("");
 
@@ -70,7 +71,6 @@ export default function EmployeerRegistration() {
       console.error("Erro ao buscar endereço:", error);
     }
   };
-  
 
   const submitForm = useCallback((event: any) => {
     event.preventDefault();
@@ -80,9 +80,6 @@ export default function EmployeerRegistration() {
 
   const handleConfirmedSubmit = useCallback(async () => {
     try {
-
-      setShowConfirm(false);
-
       if (!token || !employee) return;
 
       if (employee?.document.length !== 11) {
@@ -92,7 +89,6 @@ export default function EmployeerRegistration() {
       }
 
       if (employeeId === "new") {
-        // Verifica se já existe usuário com o mesmo CPF/document E mesmo role_id
         const existingUsers = await searchRegisterUser(token, "users", employee.document);
 
         const cpfJaExiste = existingUsers?.data?.some(
@@ -111,6 +107,7 @@ export default function EmployeerRegistration() {
         if (newEmployee.status !== 201) {
           setSuccessMessage("Erro ao criar funcionário.");
           setIsSuccessOpen(true);
+          setShowConfirm(false);
           return;
         }
 
@@ -131,11 +128,12 @@ export default function EmployeerRegistration() {
         await createEmployeeData(token, newEmployeeData);
 
         setSuccessMessage("Funcionário cadastrado com sucesso!");
+        setIsSuccessOpen(true);
+        setShowConfirm(false);
 
       } else {
         const id = Number(employeeId);
 
-        // ✅ Verifica se já existe usuário com o mesmo CPF/document e mesmo role_id, mas ID diferente
         const existingUsers = await searchRegisterUser(token, "users", employee.document);
 
         const cpfJaExiste = existingUsers?.data?.find(
@@ -143,7 +141,7 @@ export default function EmployeerRegistration() {
         );
 
         if (cpfJaExiste) {
-          console.log("Usuário encontrado:", cpfJaExiste);  // Só pra garantir
+          console.log("Usuário encontrado:", cpfJaExiste);
 
           let roleMessage = "";
 
@@ -154,7 +152,7 @@ export default function EmployeerRegistration() {
           } else if (cpfJaExiste.roleId === 3) {
             roleMessage = "Já existe um paciente cadastrado com esse CPF.";
           } else {
-            roleMessage = "Já existe um usuário cadastrado com esse CPF.)";
+            roleMessage = "Já existe um usuário cadastrado com esse CPF.";
           }
 
           setAlertMessage(roleMessage);
@@ -194,10 +192,10 @@ export default function EmployeerRegistration() {
         } else {
           setSuccessMessage("Erro ao atualizar funcionário.");
         }
-      }
 
-      setIsSuccessOpen(true);
-      setShowConfirm(false);
+        setIsSuccessOpen(true);
+        setShowConfirm(false);
+      }
     } catch (error) {
       console.log(error);
       setSuccessMessage("Erro ao salvar dados.");
@@ -219,6 +217,7 @@ export default function EmployeerRegistration() {
     createPositions,
     searchRegisterUser,
   ]);
+
 
 
   const handleLoadingData = useCallback(async () => {

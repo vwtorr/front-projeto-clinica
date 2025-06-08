@@ -2,36 +2,50 @@
 import Image from "next/image";
 import Login from "@/assets/image-login.png";
 import { useAuth } from "@/context/auth";
-import { FormEvent, use, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
 
 export default function Home() {
   const { signIn, setCookies } = useAuth();
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [errorLogin, setErrorLogin] = useState(false)
+  const [errorLogin, setErrorLogin] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
-      const userData = {
-        email:username, password
-      }
+      const userData = { email: username, password };
       const response: any = await signIn(userData);
 
-      if (response.status != 200 || response.data.access_token == null) {
+      if (response.status !== 200 || response.data.access_token == null) {
         setErrorLogin(true);
         return;
       }
 
       setCookies(response.data.access_token);
-
       router.push("/exams");
     } catch (error) {
       console.error("Erro ao fazer login:", error);
     }
   };
+
+  // Detectar mobile com largura de tela
+  useEffect(() => {
+    const isMobileDevice = window.innerWidth < 1024; // abaixo de 1024px (breakpoint do Tailwind para xl)
+    setIsMobile(isMobileDevice);
+  }, []);
+
+  if (isMobile) {
+    return (
+      <div className="flex items-center justify-center h-screen px-4 text-center">
+        <p className="text-lg font-semibold text-red-600">
+          Este sistema foi desenvolvido para uso em computadores até o momento. Por favor, acesse pelo seu desktop.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gray-50 grid grid-cols-1 xl:grid-cols-2 items-center">
@@ -54,7 +68,7 @@ export default function Home() {
               id="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className={`${errorLogin ? "!border-red-500": ""} custom-input`}
+              className={`${errorLogin ? "!border-red-500" : ""} custom-input`}
               autoComplete="off"
               placeholder="Insira seu CPF aqui..."
             />
@@ -66,26 +80,20 @@ export default function Home() {
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className={`${errorLogin ? "!border-red-500": ""} custom-input`}
+              className={`${errorLogin ? "!border-red-500" : ""} custom-input`}
               autoComplete="off"
               placeholder="Insira sua senha aqui..."
             />
           </label>
-
-          <a
-            href="#"
-            className="text-custom-link no-underline hover:underline"
-          >
+          <a href="#" className="text-custom-link no-underline hover:underline">
             Esqueceu a senha?
           </a>
-          <button
-            type="submit"
-            className="custom-button"
-          >
+          <button type="submit" className="custom-button">
             Entrar
           </button>
           {errorLogin && (
-            <p className="font-bold !text-red-600 text-center text-xl">Usuário e/ou senha incorretos.
+            <p className="font-bold !text-red-600 text-center text-xl">
+              Usuário e/ou senha incorretos.
             </p>
           )}
         </form>

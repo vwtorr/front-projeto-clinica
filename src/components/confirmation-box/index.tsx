@@ -5,6 +5,7 @@ type ConfirmationBoxProps = {
   message: string;
   onConfirm: () => void;
   onCancel: () => void;
+  isLoading?: boolean; 
 };
 
 export default function ConfirmationBox({
