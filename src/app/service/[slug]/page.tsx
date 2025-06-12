@@ -110,15 +110,15 @@ export default function Services() {
   }, []);
 
   const handlesLoadingData = useCallback(async () => {
-    const id = Number(slug);
+  const id = Number(slug);
 
-    if (slug && typeof id === "number" && slug !== "new") {
-      const serviceData = await getServicesById(token, id);
+  if (token && slug && !isNaN(id) && slug !== "new") {
+    const serviceData = await getServicesById(token, id); 
 
-      if (!serviceData?.data && serviceData.status !== 200) return;
-      setService(serviceData?.data);
-    }
-  }, [token, getServicesById, slug]);
+    if (!serviceData?.data && serviceData.status !== 200) return;
+    setService(serviceData.data);
+  }
+}, [token, getServicesById, slug]);
 
   useEffect(() => {
     handlesLoadingData();
