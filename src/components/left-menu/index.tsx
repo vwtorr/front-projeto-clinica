@@ -126,7 +126,7 @@ export default function LeftMenu() {
           className="py-4 px-4 hover:bg-[#E9F5FE] rounded-lg cursor-pointer text-[#5D7285] font-medium fixed bottom-5 left-5 w-[250px]"
         >
           <figure className="flex flex-row items-center gap-2">
-            <Logout className="w-[28px] h-[28px]" strokeWidth={2} />
+            <Logout className="w-[28px] h-[28px]" strokeWidth={3} />
             <figcaption>Sair</figcaption>
           </figure>
         </li>
