@@ -10,10 +10,15 @@ import Logout from "@/assets/log-out.svg";
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/auth";
 
 export default function LeftMenu() {
   const pathname = usePathname();
   const [openSubmenu, setOpenSubMenu] = useState<any>({});
+  const router = useRouter();
+  const { logOut } = useAuth();
+
 
   return (
     <nav className="px-5 w-[300px] h-full">
@@ -57,7 +62,7 @@ export default function LeftMenu() {
           </Link>
 
           <li className={`${(openSubmenu?.employee && !openSubmenu?.expenses) ? 'bg-[#E9F5FE]' : ''} hover:bg-[#E9F5FE] px-4 rounded-lg cursor-pointer`}>
-            <div 
+            <div
               onClick={() =>
                 setOpenSubMenu({
                   expenses: false,
@@ -86,7 +91,7 @@ export default function LeftMenu() {
             </ul>
           </li>
 
-          <li 
+          <li
             onClick={() =>
               setOpenSubMenu({
                 employee: false,
@@ -110,17 +115,22 @@ export default function LeftMenu() {
               </Link>
             </ul>
           </li>
-          
+
         </ul>
 
-        <Link href="/logout" title="Sair">
-          <li className="py-4 px-4 hover:bg-[#E9F5FE] rounded-lg cursor-pointer text-[#5D7285] font-medium fixed bottom-5 left-5 w-[250px]">
-            <figure className="flex flex-row items-center gap-2">
-              <Logout className="w-[28px] h-[28px]" strokeWidth={2} />
-              <figcaption>Sair</figcaption>
-            </figure>
-          </li>
-        </Link>
+        <li
+          onClick={async () => {
+            await logOut();
+            router.push("/");
+          }}
+          className="py-4 px-4 hover:bg-[#E9F5FE] rounded-lg cursor-pointer text-[#5D7285] font-medium fixed bottom-5 left-5 w-[250px]"
+        >
+          <figure className="flex flex-row items-center gap-2">
+            <Logout className="w-[28px] h-[28px]" strokeWidth={2} />
+            <figcaption>Sair</figcaption>
+          </figure>
+        </li>
+
       </div>
     </nav>
   );

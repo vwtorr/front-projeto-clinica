@@ -31,9 +31,8 @@ export default function Home() {
     }
   };
 
-  // Detectar mobile com largura de tela
   useEffect(() => {
-    const isMobileDevice = window.innerWidth < 1024; // abaixo de 1024px (breakpoint do Tailwind para xl)
+    const isMobileDevice = window.innerWidth < 1024; 
     setIsMobile(isMobileDevice);
   }, []);
 
